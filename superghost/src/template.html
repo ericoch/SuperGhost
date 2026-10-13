@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Superghost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E6E9EF; --surface:#F8F9FB; --ink:#1A2030; --muted:#596175; --line:#BFC6D4;
+  --red:#C2233A; --blue:#1C57BF; --red-soft:#F4D6DB; --blue-soft:#D5E0F5;
+  --on-color:#FFFFFF;
+  --font:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12151C; --surface:#1B1F28; --ink:#E7EAF0; --muted:#98A0B2; --line:#384052;
+    --red:#FF6474; --blue:#72A6FF; --red-soft:#3B1D24; --blue-soft:#1A2843;
+    --on-color:#12151C; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12151C; --surface:#1B1F28; --ink:#E7EAF0; --muted:#98A0B2; --line:#384052;
+  --red:#FF6474; --blue:#72A6FF; --red-soft:#3B1D24; --blue-soft:#1A2843;
+  --on-color:#12151C; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0;font-family:var(--font);color:var(--ink);line-height:1.45;
+  --turn:var(--ink);--turn-soft:var(--bg);
+  background-color:var(--bg);
+  transition:background-color .35s ease;
+}
+body[data-turn="0"]{--turn:var(--red);--turn-soft:var(--red-soft)}
+body[data-turn="1"]{--turn:var(--blue);--turn-soft:var(--blue-soft)}
+@supports (background-color: color-mix(in srgb, red 50%, blue)){
+  body{background-color:color-mix(in srgb, var(--turn-soft) 60%, var(--bg))}
+}
+body::before{
+  content:"";position:fixed;left:0;right:0;top:0;z-index:5;
+  height:calc(6px + env(safe-area-inset-top,0px));
+  background:var(--turn);transition:background-color .35s ease;
+}
+.wrap{max-width:900px;margin:0 auto;padding:28px 16px 56px}
+
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.01em}
+h1 small{font-weight:450;color:var(--muted);font-size:15px;margin-left:8px;letter-spacing:0}
+
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.45}
+:focus-visible{outline:3px solid var(--turn);outline-offset:2px}
+
+.btn{
+  appearance:none;border:2px solid var(--line);background:var(--surface);
+  padding:10px 16px;border-radius:999px;font-weight:650;font-size:16px;
+}
+.btn:hover:not(:disabled){border-color:var(--turn)}
+.btn.primary{background:var(--turn);border-color:var(--turn);color:var(--on-color)}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--muted);padding-left:8px;padding-right:8px}
+.btn.quiet:hover:not(:disabled){color:var(--ink);border-color:transparent}
+
+/* Scoreboard */
+.scores{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:16px}
+.player{display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-radius:14px;border:2.5px solid transparent;transition:border-color .25s}
+.player[data-p="0"]{--pc:var(--red);--pcs:var(--red-soft)}
+.player[data-p="1"]{--pc:var(--blue);--pcs:var(--blue-soft);align-items:flex-end;text-align:right}
+.player.active{border-color:var(--pc);background:var(--surface)}
+.pname{font-weight:800;font-size:20px;color:var(--pc)}
+.ghost{display:flex;gap:4px}
+.ghost span{
+  width:26px;height:30px;display:grid;place-items:center;border-radius:6px;
+  font-weight:800;font-size:16px;border:2px solid var(--line);color:var(--line);
+}
+.ghost span.got{background:var(--pc);border-color:var(--pc);color:var(--on-color)}
+.who-select{font:inherit;font-size:14px;font-weight:600;padding:4px 8px;border-radius:8px;border:2px solid var(--line);background:var(--bg);color:var(--ink);max-width:100%}
+.turnline.thinking{animation:pulse 1.3s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+.said{font-size:26px;font-weight:750;letter-spacing:.03em;color:var(--turn);min-height:1.5em}
+.turnline{text-align:center;font-size:clamp(24px,4.6vw,40px);font-weight:800;letter-spacing:-.02em;color:var(--turn);line-height:1.1;font-variation-settings:"opsz" 96}
+
+/* Board */
+.board{background:var(--surface);border-radius:20px;padding:8px 16px 22px;border:2.5px solid var(--turn);transition:border-color .35s}
+.word{overflow-x:auto;padding:22px 4px 14px;-webkit-overflow-scrolling:touch}
+.word-inner{display:flex;align-items:center;width:max-content;margin:0 auto;min-height:80px}
+.tile{
+  --pc:var(--ink);--pcs:var(--bg);
+  width:58px;height:74px;display:grid;place-items:center;flex:none;
+  font-size:44px;font-weight:780;text-transform:uppercase;line-height:1;
+  border-radius:10px;background:var(--pcs);color:var(--pc);
+  box-shadow:inset 0 -6px 0 var(--pc);
+  font-variation-settings:"opsz" 96;
+}
+.tile[data-p="0"]{--pc:var(--red);--pcs:var(--red-soft)}
+.tile[data-p="1"]{--pc:var(--blue);--pcs:var(--blue-soft)}
+.tile.new{animation:drop .32s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes drop{from{transform:translateY(-14px) scale(1.08);opacity:0}to{transform:none;opacity:1}}
+.gap{width:8px;flex:none}
+.slot{
+  appearance:none;border:0;background:transparent;padding:0;flex:none;
+  width:24px;height:74px;display:grid;place-items:center;border-radius:8px;
+}
+.slot::before{content:"";width:4px;height:40px;border-radius:2px;background:var(--line);transition:height .15s, background-color .15s}
+.slot:hover::before{background:var(--turn);height:58px}
+.word.awaiting .slot::before{background:var(--turn);opacity:.55}
+.word.awaiting .slot:hover::before{opacity:1}
+.slot.sel{width:64px}
+.slot.sel::before{display:none}
+.ph{
+  width:56px;height:74px;display:grid;place-items:center;border-radius:10px;
+  border:3px dashed var(--turn);color:var(--turn);
+  font-size:44px;font-weight:780;text-transform:uppercase;line-height:1;
+  font-variation-settings:"opsz" 96;
+}
+.ph.empty{font-size:26px;opacity:.75}
+.empty-note{color:var(--muted);font-size:15px;margin-left:10px;align-self:center}
+
+.status{text-align:center;color:var(--muted);margin:4px 0 14px;min-height:1.45em}
+.actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+
+.keys{margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.krow{display:flex;gap:6px;justify-content:center}
+.key{
+  appearance:none;width:44px;height:50px;border-radius:9px;
+  border:2px solid var(--line);background:var(--bg);
+  font-size:21px;font-weight:700;text-transform:uppercase;
+}
+.key:hover{border-color:var(--turn)}
+.key.sel{background:var(--turn);border-color:var(--turn);color:var(--on-color)}
+
+/* Panels */
+.panel{max-width:600px;margin:6px auto 0;text-align:center}
+.panel h2{margin:4px 0 6px;font-size:28px;font-weight:800;letter-spacing:-.015em;color:var(--turn)}
+.panel p{margin:0 auto 14px;max-width:62ch}
+.seq{font-weight:800;letter-spacing:.12em;white-space:nowrap}
+.answer{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:8px}
+.answer input{
+  font:inherit;font-size:22px;font-weight:650;padding:10px 16px;border-radius:999px;
+  border:2.5px solid var(--turn);background:var(--bg);color:var(--ink);
+  width:min(320px,100%);text-transform:lowercase;
+}
+.answer input:focus{outline:none;box-shadow:0 0 0 4px color-mix(in srgb, var(--turn) 30%, transparent)}
+.error{color:var(--turn);font-weight:600;min-height:1.45em}
+.vis{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin:6px 0 16px}
+.vis .tile{width:38px;height:48px;font-size:28px;box-shadow:inset 0 -4px 0 var(--pc)}
+.vis .tile.added{--pc:var(--line);--pcs:transparent;color:var(--muted);box-shadow:inset 0 -3px 0 var(--line)}
+.reveal{color:var(--muted)}
+.review{margin:4px auto 14px}
+.review p{margin-bottom:10px}
+.line{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px;margin:6px auto 12px;max-width:640px}
+.step{display:inline-flex;align-items:baseline;gap:6px;font-size:15px;white-space:nowrap}
+.step .who0{color:var(--red);font-weight:700}
+.step .who1{color:var(--blue);font-weight:700}
+.sw{font-weight:600;letter-spacing:.08em;color:var(--muted)}
+.sw b{font-weight:800}
+.sw .nl0{color:var(--red)}
+.sw .nl1{color:var(--blue)}
+.reveal b{color:var(--ink);font-weight:700}
+
+/* Moves and rules */
+.below{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:26px}
+.below h3{font-size:16px;margin:0 0 8px;font-weight:750}
+.moves{margin:0;padding-left:22px;color:var(--muted);font-size:15px}
+.moves li{margin:2px 0}
+.moves .who0{color:var(--red);font-weight:700}
+.moves .who1{color:var(--blue);font-weight:700}
+.moves .w{color:var(--ink);font-weight:700;letter-spacing:.06em}
+.none{color:var(--muted);font-size:15px;margin:0}
+details{font-size:15px;color:var(--muted)}
+details summary{cursor:pointer;color:var(--ink);font-weight:750;font-size:16px;margin-bottom:8px}
+details p{margin:0 0 10px;max-width:60ch}
+.setting{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.setting select{font:inherit;padding:6px 10px;border-radius:8px;border:2px solid var(--line);background:var(--surface);color:var(--ink)}
+.kbd{font-weight:700;color:var(--ink)}
+
+@media (max-width:640px){
+  .wrap{padding:22px 10px 44px}
+  .scores{grid-template-columns:1fr 1fr;grid-template-areas:"r b" "t t"}
+  .player[data-p="0"]{grid-area:r}.player[data-p="1"]{grid-area:b}.turnline{grid-area:t}
+  .ghost span{width:22px;height:26px;font-size:14px}
+  .tile{width:42px;height:56px;font-size:32px;box-shadow:inset 0 -5px 0 var(--pc)}
+  .slot{width:18px;height:56px}
+  .slot::before{height:30px}
+  .slot:hover::before{height:44px}
+  .slot.sel{width:48px}
+  .ph{width:42px;height:56px;font-size:32px}
+  .board{padding:6px 8px 18px}
+  .krow{gap:4px}
+  .key{width:calc((100vw - 76px) / 10);max-width:44px;height:48px;font-size:19px}
+  .below{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+</style>
+</head>
+<body data-turn="0">
+<div class="wrap">
+  <header>
+    <h1>Superghost <small>insert a letter anywhere, but don't finish a word</small></h1>
+    <button class="btn quiet" id="newGameTop">New game</button>
+  </header>
+
+  <section class="scores" id="scores" aria-label="Scores"></section>
+
+  <main class="board">
+    <div class="word" id="word"><div class="word-inner" id="wordInner"></div></div>
+    <div id="controls"></div>
+  </main>
+
+  <div class="below">
+    <section>
+      <h3>Moves this round</h3>
+      <div id="moves"></div>
+    </section>
+    <section>
+      <details>
+        <summary>Rules and settings</summary>
+        <p>Players take turns adding one letter anywhere in the row. Whoever completes a real word (of at least the minimum length) loses the round.</p>
+        <p>Instead of moving, you can challenge the player who just moved if you think no word contains the letters in their current order. They then have to name one. A real word means the challenger loses the round; no word means the challenged player loses.</p>
+        <p>Each lost round earns a letter of GHOST. Spell it out and you lose the game. Who starts the next round is a setting below; by default it's the loser.</p>
+        <p>Either colour can be played by the computer. Easy knows about 13,000 everyday words and sometimes plays carelessly; Medium knows about 36,000; Hard about 53,000; Perfect knows the whole dictionary and never makes a mistake. A computer only moves to letters it can complete with a word it knows, and challenges you when it can't think of one, so obscure words are your best weapon against the lower levels.</p>
+        <p>With the full dictionary, the second player can always win. Perfect will beat you whenever you start a round.</p>
+        <p>Keyboard: type a letter to pick it, <span class="kbd">←</span> <span class="kbd">→</span> to choose a gap, <span class="kbd">Enter</span> to place, <span class="kbd">Esc</span> to clear.</p>
+        <label class="setting">Shortest word that counts
+          <select id="minLen">
+            <option value="3">3 letters</option>
+            <option value="4">4 letters</option>
+            <option value="5">5 letters</option>
+          </select>
+        </label>
+        <label class="setting" style="margin-top:10px">Next round starts with
+          <select id="starterRule">
+            <option value="loser">The loser</option>
+            <option value="winner">The winner</option>
+            <option value="alternate">Players taking turns</option>
+          </select>
+        </label>
+        <p style="margin-top:10px">Dictionary: the ENABLE word list (172,823 words).</p>
+      </details>
+    </section>
+  </div>
+</div>
+
+<script>
+/* ---------- Dictionary ---------- */
+const DICT_RAW = "__DICT__";
+const WORDS = DICT_RAW.split(" ");
+const DICT = new Set(WORDS);
+const FREQ_RAW = "__FREQ__";  // per word: floor(2 x Zipf frequency), as a letter
+
+/* Greedy two-pointer subsequence match.
+   Walk the candidate word once; each time its letter equals the next
+   unmatched letter of the row, consume it. Taking the earliest possible
+   match never hurts (any later match could be swapped for it), so this
+   is exact, and it runs in O(word length) with no allocation. */
+function matchedCount(s, w){
+  let j = 0;
+  for (let i = 0; i < w.length && j < s.length; i++){
+    if (w.charCodeAt(i) === s.charCodeAt(j)) j++;
+  }
+  return j;
+}
+function isSubseq(s, w){ return s.length <= w.length && matchedCount(s, w) === s.length; }
+function matchIndices(s, w){
+  const idx = []; let j = 0;
+  for (let i = 0; i < w.length && j < s.length; i++){
+    if (w[i] === s[j]){ idx.push(i); j++; }
+  }
+  return j === s.length ? idx : null;
+}
+
+/* Whole-dictionary search (used only to reveal answers after someone gives up).
+   Each word gets a 26-bit mask of the letters it contains. If the row's mask
+   isn't a subset of the word's mask, the word can't possibly work, so most of
+   the 170k words are rejected with one AND before the two-pointer runs. */
+let MASKS = null;
+function maskOf(w){ let m = 0; for (let i = 0; i < w.length; i++) m |= 1 << (w.charCodeAt(i) - 97); return m; }
+function findCompletions(s, minLen){
+  if (!MASKS){ MASKS = new Uint32Array(WORDS.length); for (let i = 0; i < WORDS.length; i++) MASKS[i] = maskOf(WORDS[i]); }
+  const need = maskOf(s), min = Math.max(minLen, s.length + 1), hits = [];
+  for (let i = 0; i < WORDS.length; i++){
+    const w = WORDS[i];
+    if (w.length < min) continue;
+    if ((MASKS[i] & need) !== need) continue;
+    if (isSubseq(s, w)) hits.push(w);
+  }
+  hits.sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
+  return hits;
+}
+
+/* ---------- Computer opponent ---------- */
+/*__SOLVER__*/
+
+/* Runs the solver in a Web Worker so the page stays responsive; if the browser
+   refuses the worker, the same code runs on the page instead. */
+const Engine = (() => {
+  let worker = null, ready = false, core = null;
+  const pending = new Map();
+  let nextId = 1;
+
+  function local(){
+    if (!core){ core = SolverCore(); core.handle({ type: "init", raw: DICT_RAW, freq: FREQ_RAW }); }
+    return core;
+  }
+  function runLocal(msg, cb){
+    setTimeout(() => { let r; try { r = local().handle(msg); } catch (e){ r = { id: msg.id, error: String(e) }; } cb(r); }, 30);
+  }
+  function fallBack(){
+    if (worker){ try { worker.terminate(); } catch (e){} }
+    worker = null;
+    const waiting = [...pending.values()]; pending.clear();
+    for (const p of waiting) runLocal(p.msg, p.cb);
+  }
+  try {
+    const code = "const core = (" + SolverCore.toString() + ")();\n" +
+      "self.onmessage = function(e){ var r; try { r = core.handle(e.data); } catch (err) { r = { id: e.data.id, error: String(err) }; } if (r) self.postMessage(r); };";
+    const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+    worker = new Worker(url);
+    worker.onmessage = e => {
+      const m = e.data;
+      if (m.type === "ready"){ ready = true; for (const p of pending.values()) worker.postMessage(p.msg); return; }
+      const p = pending.get(m.id); if (!p) return;
+      pending.delete(m.id);
+      if (m.error) runLocal(p.msg, p.cb); else p.cb(m);
+    };
+    worker.onerror = e => { if (e.preventDefault) e.preventDefault(); fallBack(); };
+    worker.postMessage({ type: "init", raw: DICT_RAW, freq: FREQ_RAW });
+    setTimeout(() => { if (!ready) fallBack(); }, 5000);
+  } catch (e){ worker = null; }
+
+  return {
+    request(msg, cb){
+      msg.id = nextId++;
+      if (worker){ pending.set(msg.id, { msg, cb }); if (ready) worker.postMessage(msg); }
+      else runLocal(msg, cb);
+    }
+  };
+})();
+
+/* ---------- State ---------- */
+const NAMES = ["Red", "Blue"];
+const GHOST = "GHOST";
+const ARTICLE = { G:"a", H:"an", O:"an", S:"an", T:"a" };
+const ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+const LEVEL_NAMES = { easy: "Easy", medium: "Medium", hard: "Hard", perfect: "Perfect" };
+const THINK_MS = 650, SHOW_MOVE_MS = 450, SHOW_WORD_MS = 900, AUTO_NEXT_MS = 2600;
+
+function loadPref(key, fallback, ok){
+  try { const v = JSON.parse(localStorage.getItem(key)); if (ok(v)) return v; } catch (e){}
+  return fallback;
+}
+function savePref(key, v){ try { localStorage.setItem(key, JSON.stringify(v)); } catch (e){} }
+const validCtrl = v => Array.isArray(v) && v.length === 2 && v.every(x => x === "human" || x in LEVEL_NAMES);
+
+const S = {
+  letters: [], history: [], turn: 0, scores: [0, 0],
+  minLen: loadPref("superghost-minlen", 4, v => [3, 4, 5].includes(v)),
+  ctrl: loadPref("superghost-players", ["human", "medium"], validCtrl),   // "human" or a computer level
+  phase: "play", selSlot: 0, selLetter: null,
+  challenge: null, result: null, overruled: new Set(),
+  draft: "", error: "", pendingAccept: null, lastPlaced: -1,
+  starterRule: loadPref("superghost-starter", "loser", v => ["loser", "winner", "alternate"].includes(v)),
+  roundStarter: 0, review: null,
+  round: 0, aiBusy: null
+};
+
+const isAI = p => S.ctrl[p] !== "human";
+const anyAI = () => isAI(0) || isAI(1);
+const cur = () => S.letters.map(l => l.ch).join("");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const seq = s => `<span class="seq">${esc(s.toUpperCase())}</span>`;
+const humanCanUndo = () => S.phase === "play" && S.history.some(m => !isAI(m.p));
+
+/* ---------- Actions ---------- */
+function resetSelection(){ S.selLetter = null; S.selSlot = S.letters.length === 0 ? 0 : null; }
+
+function selectLetter(ch, fromKey){
+  if (S.phase !== "play" || isAI(S.turn)) return;
+  S.selLetter = (!fromKey && S.selLetter === ch) ? null : ch;
+  render();
+}
+function selectSlot(i){
+  if (S.phase !== "play" || isAI(S.turn)) return;
+  if (S.selSlot === i && S.selLetter){ place(); return; }
+  S.selSlot = (S.selSlot === i && S.letters.length) ? null : i;
+  render();
+}
+function place(){
+  if (S.phase !== "play" || S.selLetter == null || S.selSlot == null) return;
+  const before = cur(), pos = S.selSlot, ch = S.selLetter, p = S.turn;
+  S.letters.splice(pos, 0, { ch, p });
+  S.history.push({ pos, ch, p, before });
+  S.lastPlaced = pos;
+  const now = cur();
+  resetSelection();
+  if (now.length >= S.minLen && DICT.has(now) && !S.overruled.has(now)){
+    endRound(p, { reason: "word", word: now, before });
+    return;
+  }
+  S.turn = 1 - S.turn;
+  render();
+}
+function undo(){
+  if (!humanCanUndo()) return;
+  do {
+    const m = S.history.pop();
+    S.letters.splice(m.pos, 1);
+    S.turn = m.p;
+  } while (S.history.length && isAI(S.turn));
+  S.lastPlaced = -1; S.aiBusy = null;
+  resetSelection();
+  render();
+}
+function startChallenge(){
+  if (S.phase !== "play" || !S.letters.length) return;
+  S.phase = "challenge";
+  S.challenge = { by: S.turn, target: 1 - S.turn };
+  S.draft = ""; S.error = ""; S.pendingAccept = null; S.lastPlaced = -1;
+  resetSelection();
+  render();
+  focusInput();
+}
+function withdrawChallenge(){
+  if (S.phase !== "challenge" || isAI(S.challenge.by)) return;
+  S.turn = S.challenge.by;
+  S.phase = "play"; S.challenge = null; S.error = "";
+  render();
+}
+function setError(msg, offerAccept){
+  S.error = msg;
+  S.pendingAccept = offerAccept && !anyAI() ? S.draft.trim().toLowerCase() : null;
+  render();
+  focusInput();
+}
+function submitWord(force){
+  if (S.phase !== "challenge") return;
+  const raw = S.draft.trim().toLowerCase(), s = cur();
+  if (!raw) return setError("Type a word first.");
+  if (!/^[a-z]+$/.test(raw)) return setError("Use letters only, with no spaces or punctuation.");
+  const idx = matchIndices(s, raw);
+  if (!idx){
+    const k = matchedCount(s, raw);
+    const tail = k ? `: it gets through ${seq(s.slice(0, k))}, then has no ${seq(s[k])} after that.` : `: it has no ${seq(s[0])} to start from.`;
+    return setError(`“${esc(raw)}” doesn't contain ${seq(s)} in order${tail}`);
+  }
+  if (raw === s) return setError("That's the row as it stands. Your word has to add at least one letter.");
+  if (raw.length < S.minLen) return setError(`Words need at least ${S.minLen} letters to count.`);
+  if (!(force && !anyAI()) && !DICT.has(raw)){
+    return setError(`“${esc(raw)}” isn't in the dictionary.${anyAI() ? " Try another word, or give up." : ""}`, true);
+  }
+  endRound(S.challenge.by, { reason: "answered", word: raw, idx, forced: !DICT.has(raw) });
+}
+function giveUp(){
+  if (S.phase !== "challenge") return;
+  endRound(S.challenge.target, { reason: "gaveup", hits: findCompletions(cur(), S.minLen) });
+}
+function endRound(loser, info){
+  S.scores[loser]++;
+  S.result = Object.assign({ loser, challenge: S.challenge }, info);
+  S.phase = S.scores[loser] >= GHOST.length ? "over" : "end";
+  S.turn = loser;
+  render();
+  const b = document.getElementById("nextBtn"); if (b) b.focus({ preventScroll: true });
+}
+function overrule(){
+  const r = S.result;
+  if (!r || r.reason !== "word" || anyAI()) return;
+  S.scores[r.loser]--;
+  S.overruled.add(r.word);
+  S.turn = 1 - r.loser;
+  S.phase = "play"; S.result = null; S.lastPlaced = -1; S.review = null;
+  render();
+}
+/* After someone completes a word: ask the solver whether a better letter existed. */
+function requestReview(){
+  const r = S.result;
+  if (!r || r.reason !== "word" || (S.review && S.review.status !== "error")) return;
+  const round = S.round;
+  S.review = { status: "loading" };
+  render();
+  Engine.request({ type: "review", s: r.before, minLen: S.minLen }, res => {
+    if (S.round !== round || S.result !== r) return;
+    S.review = res.error ? { status: "error" } : Object.assign({ status: "done" }, res);
+    render();
+  });
+}
+function nextStarter(){
+  if (!S.result) return 0;
+  if (S.starterRule === "winner") return 1 - S.result.loser;
+  if (S.starterRule === "alternate") return 1 - S.roundStarter;
+  return S.result.loser;
+}
+function nextRound(){
+  const starter = nextStarter();
+  S.roundStarter = starter; S.review = null;
+  S.letters = []; S.history = []; S.challenge = null; S.result = null;
+  S.phase = "play"; S.turn = starter; S.lastPlaced = -1; S.error = "";
+  S.round++; S.aiBusy = null;
+  resetSelection();
+  render();
+}
+function newGame(){
+  S.scores = [0, 0]; S.result = null; S.overruled = new Set();
+  nextRound();
+}
+function setController(p, value){
+  S.ctrl[p] = value;
+  savePref("superghost-players", S.ctrl);
+  S.aiBusy = null;
+  render();
+}
+
+/* ---------- Computer turns ---------- */
+function aiKey(){ return [S.round, S.phase, cur(), S.turn, S.challenge ? S.challenge.by : "", S.ctrl.join()].join("|"); }
+
+function maybeAI(){
+  let kind = null, who = null;
+  if (S.phase === "play" && isAI(S.turn)){ kind = "decide"; who = S.turn; }
+  else if (S.phase === "challenge" && isAI(S.challenge.target)){ kind = "answer"; who = S.challenge.target; }
+  else if (S.phase === "end" && isAI(0) && isAI(1)){
+    const key = aiKey();
+    if (S.aiBusy === key) return;
+    S.aiBusy = key;
+    setTimeout(() => { if (aiKey() === key) nextRound(); }, AUTO_NEXT_MS);
+    return;
+  }
+  if (!kind) return;
+  const key = aiKey();
+  if (S.aiBusy === key) return;
+  S.aiBusy = key;
+  const started = Date.now();
+  Engine.request({ type: kind, s: cur(), level: S.ctrl[who], minLen: S.minLen }, res => {
+    if (aiKey() !== key) return;
+    setTimeout(() => { if (aiKey() === key) applyAI(kind, res, key); }, Math.max(0, THINK_MS - (Date.now() - started)));
+  });
+}
+function applyAI(kind, res, key){
+  if (kind === "decide"){
+    if (res.action === "challenge"){ startChallenge(); return; }
+    S.selSlot = res.pos; S.selLetter = res.ch;
+    render();
+    setTimeout(() => { if (aiKey() === key) place(); }, SHOW_MOVE_MS);
+  } else {
+    if (!res.word){ giveUp(); return; }
+    S.draft = res.word;
+    render();
+    setTimeout(() => {
+      if (aiKey() !== key) return;
+      submitWord(false);
+      if (S.phase === "challenge") giveUp();
+    }, SHOW_WORD_MS);
+  }
+}
+
+/* ---------- Rendering ---------- */
+function describeMove(m){
+  const L = seq(m.ch), s = m.before, who = `<span class="who${m.p}">${NAMES[m.p]}</span>`;
+  const after = s.slice(0, m.pos) + m.ch + s.slice(m.pos);
+  let where;
+  if (!s.length) return `${who} started with ${L}`;
+  if (m.pos === 0) where = `at the start`;
+  else if (m.pos === s.length) where = `at the end`;
+  else where = `between ${seq(s[m.pos - 1])} and ${seq(s[m.pos])}`;
+  return `${who} put ${L} ${where}: <span class="w">${esc(after.toUpperCase())}</span>`;
+}
+function slotLabel(i, n){
+  if (n === 0) return "First letter";
+  if (i === 0) return "Gap at the start";
+  if (i === n) return "Gap at the end";
+  return `Gap between ${S.letters[i-1].ch.toUpperCase()} and ${S.letters[i].ch.toUpperCase()}`;
+}
+
+function renderScores(){
+  const active = S.phase === "challenge" ? S.challenge.target : (S.phase === "play" ? S.turn : -1);
+  const opts = p => [["human", "Human"], ...Object.entries(LEVEL_NAMES).map(([k, v]) => [k, `Computer: ${v}`])]
+    .map(([v, l]) => `<option value="${v}"${S.ctrl[p] === v ? " selected" : ""}>${l}</option>`).join("");
+  const panel = p => `
+    <div class="player${active === p ? " active" : ""}" data-p="${p}">
+      <span class="pname">${NAMES[p]}</span>
+      <select class="who-select" data-ctrl="${p}" aria-label="Who plays ${NAMES[p]}">${opts(p)}</select>
+      <span class="ghost" aria-label="${S.scores[p]} of 5 letters">${
+        GHOST.split("").map((c, i) => `<span class="${i < S.scores[p] ? "got" : ""}">${c}</span>`).join("")
+      }</span>
+    </div>`;
+  let line, thinking = false;
+  if (S.phase === "play"){
+    thinking = isAI(S.turn);
+    line = thinking ? `${NAMES[S.turn]} is thinking` : `${NAMES[S.turn]} to play`;
+  }
+  else if (S.phase === "challenge") line = `${NAMES[S.challenge.target]} must name a word`;
+  else if (S.phase === "end") line = `Round over`;
+  else line = `Game over`;
+  document.getElementById("scores").innerHTML = panel(0) + `<div class="turnline${thinking ? " thinking" : ""}" aria-live="polite">${line}</div>` + panel(1);
+}
+
+function renderWord(){
+  const inPlay = S.phase === "play", humanTurn = inPlay && !isAI(S.turn), n = S.letters.length;
+  let h = "";
+  for (let i = 0; i <= n; i++){
+    if (inPlay){
+      const sel = S.selSlot === i;
+      const showSel = sel && (humanTurn || S.selLetter);
+      const inner = showSel ? `<span class="ph${S.selLetter ? "" : " empty"}">${S.selLetter ? esc(S.selLetter) : "?"}</span>` : "";
+      h += `<button class="slot${showSel ? " sel" : ""}" data-slot="${i}" aria-pressed="${sel}" aria-label="${slotLabel(i, n)}"${humanTurn ? "" : " disabled"}>${inner}</button>`;
+    } else if (i > 0 && i < n){
+      h += `<span class="gap"></span>`;
+    }
+    if (i < n){
+      const l = S.letters[i];
+      h += `<span class="tile${i === S.lastPlaced ? " new" : ""}" data-p="${l.p}" role="img" aria-label="${l.ch.toUpperCase()}, placed by ${NAMES[l.p]}">${esc(l.ch)}</span>`;
+    }
+  }
+  if (humanTurn && n === 0) h += `<span class="empty-note">Empty row: any letter starts the round.</span>`;
+  const inner = document.getElementById("wordInner");
+  inner.innerHTML = h;
+  document.getElementById("word").classList.toggle("awaiting", humanTurn && S.selLetter != null && S.selSlot == null);
+  S.lastPlaced = -1;
+  const sel = inner.querySelector(".slot.sel");
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function playControls(){
+  const n = S.letters.length, opp = NAMES[1 - S.turn], ai = isAI(S.turn);
+  const L = S.selLetter, slot = S.selSlot, ready = !ai && L != null && slot != null;
+  let status;
+  if (ai) status = `${NAMES[S.turn]} (computer, ${LEVEL_NAMES[S.ctrl[S.turn]]}) is choosing a move.`;
+  else if (n === 0) status = L ? `Place ${seq(L)} to start the round.` : `${NAMES[S.turn]}, pick any letter to start.`;
+  else if (ready) status = `Press Place, or tap the preview again.`;
+  else if (L) status = `Now pick a gap for ${seq(L)}.`;
+  else if (slot != null) status = `Now pick a letter for that gap.`;
+  else status = `Pick a letter and a gap, in either order.`;
+  const keys = ROWS.map(r => `<div class="krow">${
+    r.split("").map(c => `<button class="key${!ai && L === c ? " sel" : ""}" data-key="${c}" aria-pressed="${L === c}"${ai ? " disabled" : ""}>${c}</button>`).join("")
+  }</div>`).join("");
+  return `
+    <p class="status">${status}</p>
+    <div class="actions">
+      <button class="btn primary" id="placeBtn" ${ready ? "" : "disabled"}>Place ${!ai && L ? esc(L.toUpperCase()) : "letter"}</button>
+      <button class="btn" id="undoBtn" ${humanCanUndo() ? "" : "disabled"}>Undo</button>
+      <button class="btn" id="challengeBtn" ${n && !ai ? "" : "disabled"}>Challenge ${opp}</button>
+    </div>
+    <div class="keys" role="group" aria-label="Letters">${keys}</div>`;
+}
+
+function challengeControls(){
+  const c = S.challenge, s = cur();
+  const need = Math.max(S.minLen, s.length + 1);
+  if (isAI(c.target)){
+    return `
+      <div class="panel">
+        <h2>${NAMES[c.by]} challenges ${NAMES[c.target]}</h2>
+        <p>${NAMES[c.target]} has to name a real word containing ${seq(s)} in that order.</p>
+        <p class="said" aria-live="polite">${S.draft ? esc(S.draft) : "Thinking of a word"}</p>
+      </div>`;
+  }
+  const showAccept = S.pendingAccept && S.pendingAccept === S.draft.trim().toLowerCase();
+  const lead = isAI(c.by)
+    ? `${NAMES[c.by]} doesn't think any word fits ${seq(s)}. ${NAMES[c.target]}, prove it wrong: name a real word that contains those letters in that order.`
+    : `${NAMES[c.target]}, name a real word that contains ${seq(s)} in that order, with letters added anywhere.`;
+  return `
+    <div class="panel">
+      <h2>${NAMES[c.by]} challenges ${NAMES[c.target]}</h2>
+      <p>${lead} It needs at least ${need} letters.</p>
+      <div class="answer">
+        <input id="wordInput" aria-label="Your word" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Type your word" value="${esc(S.draft)}">
+        <button class="btn primary" id="checkBtn">Check word</button>
+      </div>
+      <p class="error" role="alert">${S.error}</p>
+      ${showAccept ? `<p><button class="btn" id="acceptBtn">Both players agree: count “${esc(S.pendingAccept)}”</button></p>` : ""}
+      <div class="actions">
+        <button class="btn" id="giveUpBtn">${NAMES[c.target]} gives up</button>
+        ${isAI(c.by) ? "" : `<button class="btn quiet" id="withdrawBtn">Withdraw challenge</button>`}
+      </div>
+    </div>`;
+}
+
+function wordVis(word, idx){
+  const owner = new Map(idx.map((wi, k) => [wi, S.letters[k].p]));
+  return `<div class="vis" role="img" aria-label="${esc(word)}">${
+    word.split("").map((ch, i) => owner.has(i)
+      ? `<span class="tile" data-p="${owner.get(i)}">${esc(ch)}</span>`
+      : `<span class="tile added">${esc(ch)}</span>`).join("")
+  }</div>`;
+}
+
+/* A string with its newest letter picked out in the colour of whoever placed it. */
+function stepHTML(prev, next, p){
+  let i = 0;
+  while (i < prev.length && prev[i] === next[i]) i++;
+  const up = next.toUpperCase();
+  return `<span class="step"><span class="who${p}">${NAMES[p]}</span> <span class="sw">${esc(up.slice(0, i))}<b class="nl${p}">${esc(up[i])}</b>${esc(up.slice(i + 1))}</span></span>`;
+}
+function lineHTML(start, line, firstPlayer){
+  let prev = start, p = firstPlayer, out = "";
+  for (const s of line){ out += stepHTML(prev, s, p); prev = s; p = 1 - p; }
+  return `<div class="line">${out}</div>`;
+}
+function reviewHTML(r){
+  const me = r.loser, opp = 1 - me, R = S.review;
+  if (!R) return `<p><button class="btn" id="reviewBtn">Show a better choice</button></p>`;
+  if (R.status === "loading") return `<p class="reveal">Checking every letter ${NAMES[me]} could have added instead…</p>`;
+  if (R.status === "error" || R.verdict === "unknown"){
+    return `<p class="reveal">That position is too big to search fully in the time allowed.</p>`;
+  }
+  if (R.verdict === "win"){
+    const end = R.forced
+      ? `${NAMES[opp]} is then left with nothing safe: every letter either finishes a word, such as <b>${esc(R.forced)}</b>, or leaves letters no word contains, which ${NAMES[me]} could challenge.`
+      : `${NAMES[opp]} is then left with nothing safe: every letter leaves letters no word contains, which ${NAMES[me]} could challenge.`;
+    return `<div class="review">
+      <p>${NAMES[me]} had a winning letter. Here's one way it could go, and whatever ${NAMES[opp]} tries instead, ${NAMES[me]} can still force the win:</p>
+      ${lineHTML(r.before, R.line, me)}
+      <p class="reveal">${end}</p></div>`;
+  }
+  const why = R.noSafe
+    ? `Every letter ${NAMES[me]} could add either finished a word or left letters no word contains.`
+    : `Against best play, every letter ${NAMES[me]} could have added loses.`;
+  const hope = R.hope
+    ? `<p class="reveal">The best hope was aiming for <b>${esc(R.hope.word)}</b>, which ${NAMES[opp]} would have had to finish, but ${NAMES[opp]} could have steered away from it:</p>${lineHTML(r.before, R.hope.path, me)}`
+    : `<p class="reveal">There wasn't even a word ${NAMES[opp]} would have had to finish.</p>`;
+  return `<div class="review"><p>${NAMES[me]} was doomed anyway. ${why}</p>${hope}</div>`;
+}
+
+let FREQ_OF = null;
+function byFamiliarity(a, b){
+  if (!FREQ_OF){ FREQ_OF = new Map(); for (let i = 0; i < WORDS.length; i++) FREQ_OF.set(WORDS[i], FREQ_RAW.charCodeAt(i) - 97); }
+  return (FREQ_OF.get(b) - FREQ_OF.get(a)) || (a.length - b.length) || (a < b ? -1 : 1);
+}
+
+function resultControls(){
+  const r = S.result, L = GHOST[S.scores[r.loser] - 1], loser = NAMES[r.loser], winner = NAMES[1 - r.loser];
+  const over = S.phase === "over";
+  const head = over ? `${loser} is a GHOST. ${winner} wins.` : `${loser} picks up ${ARTICLE[L]} ${L}`;
+  let body = "", extra = "";
+  if (r.reason === "word"){
+    body = `<p>${seq(r.word)} is a word, and ${loser} completed it.</p>`;
+    body += reviewHTML(r);
+    if (!anyAI()) extra = `<button class="btn quiet" id="overruleBtn">It's not a word: undo the loss and keep playing</button>`;
+  } else if (r.reason === "answered"){
+    body = `<p>${NAMES[r.challenge.by]} challenged, and ${NAMES[r.challenge.target]} answered with ${seq(r.word)}${r.forced ? " (accepted by agreement)" : ""}. Letters in grey are the ones that would be added.</p>${wordVis(r.word, r.idx)}`;
+  } else {
+    const hits = r.hits, s = cur(), challenger = r.challenge.by;
+    const first = `${NAMES[challenger]} challenged, and ${loser} couldn't name a word.`;
+    if (!hits.length){
+      body = `<p>${first}</p><p class="reveal">Nothing in the dictionary contains ${seq(s)} in order, so the challenge was right.</p>`;
+    } else {
+      /* From here the challenger would place the next letter, so a word needing an
+         odd number of added letters ends on the challenger's letter. */
+      hits.sort(byFamiliarity);
+      const theirs = hits.filter(w => (w.length - s.length) % 2 === 1);
+      const yours = hits.filter(w => (w.length - s.length) % 2 === 0);
+      const list = ws => ws.slice(0, 6).map(w => `<b>${esc(w)}</b>`).join(", ") + (ws.length > 6 ? `, and ${(ws.length - 6).toLocaleString()} more` : "");
+      const total = hits.length === 1 ? "There was one" : `There were ${hits.length.toLocaleString()}`;
+      let verdict;
+      if (theirs.length) verdict = `${loser} still had words to aim for: ${theirs.length.toLocaleString()} of them would have ended on ${NAMES[challenger]}'s letter.`;
+      else verdict = `None of them would have ended on ${NAMES[challenger]}'s letter, so every word that fits was one ${loser} would have had to finish.`;
+      body = `<p>${first}</p>
+        <p class="reveal">${total}, and naming any of them would have beaten the challenge. ${verdict}</p>
+        ${theirs.length ? `<p class="reveal">Words ${NAMES[challenger]} would have had to finish: ${list(theirs)}.</p>` : ""}
+        ${yours.length ? `<p class="reveal">Words ${loser} would have finished: ${list(yours)}.</p>` : ""}`;
+    }
+  }
+  const auto = !over && isAI(0) && isAI(1) ? `<p class="reveal">Next round starts automatically.</p>` : "";
+  return `
+    <div class="panel">
+      <h2>${head}</h2>
+      ${body}${auto}
+      <div class="actions">
+        <button class="btn primary" id="nextBtn">${over ? "New game" : `Next round (${NAMES[nextStarter()]} starts)`}</button>
+        ${extra}
+      </div>
+    </div>`;
+}
+
+function renderMoves(){
+  const el = document.getElementById("moves");
+  el.innerHTML = S.history.length
+    ? `<ol class="moves">${S.history.map(m => `<li>${describeMove(m)}</li>`).join("")}</ol>`
+    : `<p class="none">No moves yet.</p>`;
+}
+
+function render(){
+  const focusKey = (() => {
+    const a = document.activeElement; if (!a) return null;
+    if (a.dataset && a.dataset.slot != null) return `[data-slot="${a.dataset.slot}"]`;
+    if (a.dataset && a.dataset.key) return `[data-key="${a.dataset.key}"]`;
+    if (a.dataset && a.dataset.ctrl) return `[data-ctrl="${a.dataset.ctrl}"]`;
+    if (a.id && a.id !== "wordInput") return `#${a.id}`;
+    return null;
+  })();
+  document.body.dataset.turn = S.phase === "challenge" ? S.challenge.target : S.turn;
+  renderScores();
+  renderWord();
+  const c = document.getElementById("controls");
+  c.innerHTML = S.phase === "play" ? playControls() : S.phase === "challenge" ? challengeControls() : resultControls();
+  renderMoves();
+  if (focusKey){ const f = document.querySelector(focusKey); if (f && !f.disabled) f.focus({ preventScroll: true }); }
+  maybeAI();
+}
+function focusInput(){
+  const i = document.getElementById("wordInput");
+  if (i){ i.focus({ preventScroll: true }); const v = i.value.length; i.setSelectionRange(v, v); }
+}
+
+/* ---------- Events ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.slot != null) return selectSlot(parseInt(t.dataset.slot, 10));
+  if (t.dataset.key) return selectLetter(t.dataset.key, false);
+  switch (t.id){
+    case "placeBtn": return place();
+    case "undoBtn": return undo();
+    case "challengeBtn": return isAI(S.turn) ? null : startChallenge();
+    case "checkBtn": return submitWord(false);
+    case "acceptBtn": return submitWord(true);
+    case "giveUpBtn": return giveUp();
+    case "withdrawBtn": return withdrawChallenge();
+    case "nextBtn": return S.phase === "over" ? newGame() : nextRound();
+    case "overruleBtn": return overrule();
+    case "reviewBtn": return requestReview();
+    case "newGameTop": return newGame();
+  }
+});
+document.addEventListener("change", e => {
+  if (e.target.dataset && e.target.dataset.ctrl != null) setController(parseInt(e.target.dataset.ctrl, 10), e.target.value);
+});
+document.addEventListener("input", e => {
+  if (e.target.id !== "wordInput") return;
+  S.draft = e.target.value;
+  const a = document.getElementById("acceptBtn");
+  if (a) a.parentElement.style.display = (S.pendingAccept === S.draft.trim().toLowerCase()) ? "" : "none";
+});
+document.addEventListener("keydown", e => {
+  if (e.target.id === "wordInput"){
+    if (e.key === "Enter"){ e.preventDefault(); submitWord(false); }
+    return;
+  }
+  if (e.target.matches && e.target.matches("input, select, textarea")) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z"){ if (humanCanUndo()){ e.preventDefault(); undo(); } return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (S.phase !== "play" || isAI(S.turn)) return;
+  const onButton = e.target.tagName === "BUTTON";
+  if (/^[a-z]$/i.test(e.key)){ e.preventDefault(); selectLetter(e.key.toLowerCase(), true); }
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight"){
+    e.preventDefault();
+    const n = S.letters.length;
+    if (S.selSlot == null) S.selSlot = n;
+    else S.selSlot = Math.max(0, Math.min(n, S.selSlot + (e.key === "ArrowLeft" ? -1 : 1)));
+    render();
+  }
+  else if (e.key === "Enter" && !onButton){ e.preventDefault(); place(); }
+  else if (e.key === "Escape"){ resetSelection(); render(); }
+});
+const starterSel = document.getElementById("starterRule");
+starterSel.value = S.starterRule;
+starterSel.addEventListener("change", () => {
+  S.starterRule = starterSel.value;
+  savePref("superghost-starter", S.starterRule);
+  render();
+});
+const minSel = document.getElementById("minLen");
+minSel.value = String(S.minLen);
+minSel.addEventListener("change", () => {
+  S.minLen = parseInt(minSel.value, 10);
+  savePref("superghost-minlen", S.minLen);
+  S.aiBusy = null;
+  render();
+});
+
+resetSelection();
+render();
+
+</script>
+</body>
+</html>
